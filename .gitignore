@@ -1,0 +1,12 @@
+Desktop/
+Downloads/
+OneDrive/
+*.log
+*.tmp
+*.srt
+NTUSER.*
+AppData/
+Saved Games/
+Microsoft/
+.vscode/
+*.regtrans-ms
