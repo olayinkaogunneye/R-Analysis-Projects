@@ -1,0 +1,300 @@
+---
+title: "Heart Rate Analysis"
+author: "olayinka ogunneye"
+date: "2025-02-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Introduction
+
+Heart disease is a leading cause of death worldwide. This project explores **risk factors associated with heart disease**, particularly how **maximum heart rate achieved (thalach)** affects the likelihood of disease.  
+
+I used statistical tests and logistic regression to determine the most **significant predictors** and built a model for prediction.
+
+
+### Data Preparation
+
+```{r}
+# Load the necessary libraries
+library(tidyverse)
+library(yardstick)
+library(Metrics)
+library(rmarkdown)
+
+# Load dataset
+
+hd_data <- read.csv("C:/Users/olayi/Desktop/Data/R/Heart Rate Analysis/Cleveland_hd.csv")
+
+# Convert class variable to binary (0 = No Disease, 1 = Disease)
+hd_data <- hd_data %>% mutate(hd = ifelse(class > 0, 1, 0))
+
+# View first few rows
+head(hd_data, 5)
+```
+
+### Statistical Tests
+
+
+##### **Chi-square test (Categorical Variable: sex)**
+
+The Chi-square test is used to examine the relationship between two categorical variables.
+Since sex is categorical (0 = female, 1 = male) and hd (heart disease) is also categorical 
+(0 = No Disease, 1 = Disease), we use a Chi-square test to determine whether sex distribution is significantly different between heart disease and non-heart disease groups.
+
+##### **T-tests (Continuous Variables: age, thalach)**
+
+A T-test compares the means of a continuous variable between two groups.
+Since age and thalach (maximum heart rate) are numerical variables, we use a 
+T-test to check if their means are significantly different between people with 
+and without heart disease.
+
+We analyze whether sex, age, and maximum heart rate (thalach) are significantly associated with heart disease.
+
+
+```{r}
+# Chi-square test: Sex vs. Heart Disease
+hd_sex <- chisq.test(hd_data$sex, hd_data$hd)
+hd_sex
+
+```
+
+**p-value**: `r format(hd_sex$p.value, scientific=TRUE)`
+
+
+**Conclusion**: There is a significant relationship between sex and heart disease, suggesting males are at higher risk.
+
+```{r}
+# T-tests for continuous variables
+hd_age <- t.test(hd_data$age ~ hd_data$hd)
+hd_heartrate <- t.test(hd_data$thalach ~ hd_data$hd)
+
+hd_age
+hd_heartrate
+```
+
+**p-value**: `r format(hd_age$p.value, scientific=TRUE)`
+
+**Conclusion**: Individuals with heart disease tend to be older than those without.
+
+**p-value**: `r format(hd_heartrate$p.value, scientific=TRUE)`
+
+**Conclusion**: Lower thalach values are significantly associated with heart disease, indicating poor cardiovascular response.
+
+
+
+#### **Statistical Significance Reporting**
+
+In statistical analysis, the **p-value** helps determine whether an observed effect is statistically significant. The common thresholds are:
+
+- **p < 0.05** → Indicates statistical significance, meaning there is less than a 5% probability that the observed result is due to random chance.
+- **p < 0.01** → Stronger evidence against the null hypothesis.
+- **p < 0.001** → Very strong evidence, meaning the likelihood of the result occurring due to chance is extremely low.
+
+
+##### **Applying This to Our Results**
+
+Based on our tests:
+
+- The **chi-square test for sex and heart disease** yielded **p = 2.667e-06**, which is **p < 0.001**, indicating a strong relationship between sex and heart disease.
+
+- The **t-test for age and heart disease** gave **p = 7.061e-05**, which is **p < 0.001**, suggesting age is significantly associated with heart disease.
+
+- The **t-test for thalach (max heart rate) and heart disease** resulted in **p = 9.106e-14**, which is also **p < 0.001**, showing a highly significant relationship between heart disease and maximum heart rate.
+
+Thus, all three predictors—**sex, age, and thalach**—are significantly associated with heart disease at **p < 0.001**, meaning their effects are unlikely to be due to random variation.
+
+
+Save the highly signficant features to a list
+
+```{r}
+highly_significant <- list("age", "sex", "thalach")
+```
+
+### Data Visualization
+
+A good picture is worth a thousand words. In addition to p-values from statistical tests, we can plot the age, sex, and maximum heart rate distributions with respect to our outcome variable. This will give us a sense of both the direction and magnitude of the relationship.
+
+
+```{r}
+# Recode hd to be labelled
+
+hd_data <- hd_data %>% mutate(hd_labelled = ifelse(hd == 0, "No disease", "Disease"))
+
+# Visualizing gender distribution across heart disease
+ggplot(hd_data, aes(x = hd_labelled, fill = factor(sex))) + 
+  geom_bar(position = "fill") + 
+  ylab("Sex %") + 
+  xlab("Heart Disease (0 = No, 1 = Yes)") +
+  ggtitle("Gender Distribution Across Heart Disease") +
+  theme_minimal()
+
+# Boxplot for age
+ggplot(hd_data, aes(x = hd_labelled, y = age)) + 
+  geom_boxplot() +
+  xlab("Heart Disease (0 = No, 1 = Yes)") +
+  ylab("Age") +
+  ggtitle("Age Distribution by Heart Disease Status") +
+  theme_minimal()
+
+# Boxplot for thalach (maximum heart rate achieved)
+ggplot(hd_data, aes(x = hd_labelled, y = thalach)) + 
+  geom_boxplot() +
+  xlab("Heart Disease (0 = No, 1 = Yes)") +
+  ylab("Max Heart Rate Achieved (thalach)") +
+  ggtitle("Maximum Heart Rate by Heart Disease Status") +
+  theme_minimal()
+
+
+```
+
+##### **Putting all three variables in one model**
+
+The plots and the statistical tests both confirmed that all the three variables are highly significantly associated with our outcome (p<0.001 for all tests).
+
+In general, we want to use multiple logistic regression when we have one binary outcome variable and two or more predicting variables. The binary variable is the dependent (Y) variable; we are studying the effect that the independent (X) variables have on the probability of obtaining a particular value of the dependent variable. For example, we might want to know the effect that maximum heart rate, age, and sex have on the probability that a person will have a heart disease in the next year. The model will also tell us what the remaining effect of maximum heart rate is after we control or adjust for the effects of the other two effectors.
+
+The glm() command is designed to perform generalized linear models (regressions) on binary outcome data, count data, probability data, proportion data, and many other data types. In our case, the outcome is binary following a binomial distribution.
+
+
+```{r}
+# use glm function from base R and specify the family argument as binomial
+model <-glm(data = hd_data, hd~age+sex+thalach, family="binomial")
+
+# extract the model summary
+summary(model)
+```
+
+In medical research, it is common practice to report the Odds Ratio (OR) to measure how strongly a particular factor (A) is associated with an outcome (B). An OR greater than 1 indicates a positive association, meaning the presence of A increases the likelihood of outcome B occurring. Conversely, an OR less than 1 suggests a negative association, meaning A decreases the likelihood of B occurring.
+
+In R, the logistic regression output provides log(Odds Ratios) in the estimate column of the coefficient table. Since these values are in logarithmic form, they must be exponentiated (using exp()) to convert them into the original Odds Ratio (OR) scale. Additionally, a 95% Confidence Interval (CI) for the OR should be computed to quantify the uncertainty in the estimate. This helps in accurately interpreting the effect of each predictor in the model.
+
+```{r}
+# load the broom package
+ library(broom)
+
+# tidy up the coefficient table
+tidy_m <- tidy(model)
+tidy_m
+
+# calculate OR
+tidy_m$OR <- exp(tidy_m$estimate)
+
+# calculate 95% CI and save as lower CI and upper CI
+tidy_m$lower_CI <- exp(tidy_m$estimate - 1.96 * tidy_m$std.error)
+tidy_m$upper_CI <- exp(tidy_m$estimate + 1.96 * tidy_m$std.error)
+
+# display the updated coefficient table
+tidy_m
+```
+
+###### **Interpretation of Table 1**
+
+- The Estimate represents the log odds (log-OR) of heart disease.
+
+- The Z-Statistic tests whether a predictor is statistically significant.
+
+- The P-Value indicates significance (p < 0.001 is considered highly significant in medical research.
+
+###### **From the Table**
+
+- Sex `r format(tidy_m$p.value[tidy_m$term == "sex"], scientific = TRUE)` is highly significant (p < 0.001).
+
+- Thalach `r format(tidy_m$p.value[tidy_m$term == "thalach"], scientific = TRUE)` is highly significant (p < 0.001).
+
+- Age `r format(tidy_m$p.value[tidy_m$term == "age"], scientific = TRUE)` is borderline significant (p < 0.05).
+
+The Intercept represents the baseline log-odds when all predictors are zero.
+
+
+###### **Interpretation of Table 2**
+
+Odds Ratio(OR) represents how the odds of heart disease change per unit increase in the predictor.
+
+95% Confidence Interval(CI) indicates the range where the true OR is likely to fall.
+
+
+##### **Key Findings**
+
+**Sex (OR = `r round(tidy_m$OR[tidy_m$term == "sex"], 2)`)**
+
+ - Males have `r round(tidy_m$OR[tidy_m$term == "sex"], 2)` times higher odds of heart disease than females.
+ 
+This effect is highly significant (p < 0.001), as the confidence interval does not include 1.
+
+
+**Maximum Heart Rate Achieved (thalach) (OR = `r round(tidy_m$OR[tidy_m$term == "thalach"], 2)`)**
+
+- For every 1 bpm increase in heart rate, the odds of heart disease decrease by about `r round(100 * (1 - tidy_m$OR[tidy_m$term == "thalach"]), 2)`%.
+
+- This suggests that higher heart rates during exercise may be protective against heart disease (p < 0.001).
+
+**Age (OR = `r round(tidy_m$OR[tidy_m$term == "age"], 2)`)**
+
+ - Older age slightly increases the odds of heart disease.
+ 
+ - However, this effect is borderline significant (p < 0.05).
+
+##### **Predict the probability of heart disease**
+
+So far, we have developed a logistic regression model and analyzed its coefficients and odds ratios. 
+Now, we might ask how this model can be used to predict an individual's likelihood of having heart 
+disease based on their age, sex, and maximum heart rate. Additionally, we want to establish a decision 
+rule for clinical use by setting a cutoff value for the predicted probability. In a real-world scenario, 
+a doctor assessing a patient during a health check-up would need to determine the probability of heart 
+disease for specific predictor values. For example, what is the predicted probability for a 45-year-old 
+male with a maximum heart rate of 170? To answer this, we create a data frame called new_data, where 
+we specify the desired values for prediction.
+
+```{r}
+pred_prob <- predict(model, hd_data, type="response")
+```
+
+Create a decision rule using probability 0.5 as cutoff and save the predicted decision into the main data frame
+
+```{r}
+hd_data$pred_hd <- ifelse(pred_prob >= 0.5, 1, 0)
+```
+
+```{r}
+# create a newdata data frame to save a new case information
+
+# Note: sex = 1 represents Male, sex = 0 represents Female
+newdata <- data.frame(age = 45, sex = 1, thalach = 170)
+
+
+# predict probability for this new case and print out the predicted value
+p_new <- predict(model,newdata, type = "response")
+p_new
+```
+
+### Model Performance Metrics
+
+To evaluate the performance of our model, we will use several common metrics. The simplest one is Accuracy, which measures the proportion of correct predictions out of all predictions made. We can also calculate the Classification Error Rate as 1− Accuracy, which represents the proportion of incorrect predictions.
+
+However, Accuracy alone can be misleading, especially when dealing with imbalanced data (i.e., when one class is much more common than the other). A more reliable metric is the Area Under the ROC Curve (AUC), which measures the model's ability to distinguish between classes. AUC values range from 0 to 1, with values closer to 1 indicating better model performance.
+
+Lastly, we will examine the Confusion Matrix, a 𝑁×𝑁table (where𝑁 is the number of outcome categories). Since we are dealing with a binary classification problem (𝑁= 2), our confusion matrix will be 2 × 2. This table compares the predicted outcome with the actual outcome, helping us understand where the model is making errors.
+
+```{r}
+# Calculate and print the accuracy score
+accuracy <- accuracy(hd_data$hd, hd_data$pred_hd)
+print(paste("Accuracy=", accuracy))
+
+# Calculate and print the auc score
+auc <- auc(hd_data$hd,hd_data$pred_hd)
+print(paste("AUC=", auc))
+
+# Calculate and print the accuracy score
+classification_error <- ce(hd_data$hd,hd_data$pred_hd)
+print(paste("Classification Error=", classification_error))
+
+# Calculate and print the confusion matrix
+confusion <- conf_mat(table(hd_data$hd, hd_data$pred_hd))
+confusion
+```
+
+

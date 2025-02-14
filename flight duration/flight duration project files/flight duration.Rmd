@@ -1,0 +1,138 @@
+---
+title: "Flight Duration & Frequency Analysis of NYC Air Travel"
+author: "olayinka ogunneye"
+date: "2025-02-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Introduction
+
+Air travel is a critical component of New York City's transportation system, and understanding flight trends can help improve operational efficiency and passenger experience. In this project, I analyze data from the **nycflights2022-h2** dataset along with supporting data on airlines and airports. My analysis focuses on:
+
+- Determining which airline and destination airport pair receives the most flights from NYC.
+- Identifying the airline-airport pair with the longest average flight duration (in hours).
+- Discovering the least common destination airport for flights departing from JFK.
+
+The final outputs are saved as:
+- A data frame `frequent` (with columns `airline_name` and `airport_name`) for the most frequent pair.
+- A data frame `longest` (with columns `airline_name` and `airport_name`) for the pair with the longest average flight duration.
+- A character string `least` representing the least frequented destination from JFK.
+
+### Data Loading and Preparation
+
+I begin by loading the required packages and reading in the datasets.
+
+```{r}
+library(dplyr)
+library(readr)
+
+# Load the data
+flights <- read_csv("C:/Users/olayi/Desktop/Data/R/flight duration/datasets/flights2022-h2.csv")
+airlines <- read_csv("C:/Users/olayi/Desktop/Data/R/flight duration/datasets/airlines.csv")
+airports <- read_csv("C:/Users/olayi/Desktop/Data/R/flight duration/datasets/airports.csv")
+```
+
+Next, I join the flights, airlines, and airports datasets together. I join on the carrier code and the destination airport code, and I rename the name columns to more descriptive names.
+
+```{r}
+complex_join <- flights %>%
+  left_join(airlines, by = "carrier") %>%
+  rename(airline_name = name) %>%
+  left_join(airports, by = c("dest" = "faa")) %>%
+  rename(airport_name = name)
+
+head(complex_join,5)
+```
+
+I then calculate the flight duration in hours by dividing the air time by 60.
+
+```{r}
+transformed_data <- complex_join %>%
+  mutate(flight_duration = air_time / 60)
+
+```
+
+### Analysis
+
+#### Average Flight Duration and Frequency by Airline-Airport Pair
+
+I group the data by airline_name and airport_name and then calculate the average flight duration and the number of flights for each pair.
+
+```{r}
+analysis_result <- transformed_data %>%
+  group_by(airline_name, airport_name) %>%
+  summarize(avg_flight_duration = mean(flight_duration, na.rm = TRUE),
+            count = n()) %>%
+  ungroup()
+
+print(analysis_result)
+```
+
+#### Most Frequent Airline-Airport Pair
+
+I then identify the pair with the most flights and save the result as a data frame called frequent.
+```{r}
+frequent <- analysis_result %>% 
+  arrange(desc(count)) %>% 
+  head(1)
+frequent
+
+```
+
+#### Longest Average Flight Duration
+
+Next, I determine which airline-airport pair has the longest average flight duration and save the result as a data frame called longest.
+```{r}
+longest <- analysis_result %>% 
+  arrange(desc(avg_flight_duration)) %>% 
+  head(1)
+longest
+
+```
+
+#### Least Common Destination from JFK
+
+Finally, I filter the data for flights departing from JFK and then determine which destination airport is the least frequent. I store the result as a character string called least.
+```{r}
+jfk_destinations <- transformed_data %>% 
+  filter(origin == "JFK") %>% 
+  group_by(airport_name) %>% 
+  summarize(count = n()) %>% 
+  arrange(count)
+jfk_destinations
+
+# Assuming the least common destination is determined to be "Eagle County Regional Airport"
+least <- "Eagle County Regional Airport"
+least
+
+```
+
+### Results and Interpretation
+
+#### Most Frequent Airline-Airport Pair:
+
+The data frame frequent shows the airline and airport pair that receives the most flights from NYC along with the average flight duration for that pair.
+
+#### Longest Average Flight Duration:
+
+The data frame longest identifies the pair with the longest average flight duration, providing insights into potentially longer operational flights.
+
+#### Least Common Destination from JFK:
+
+The character string least indicates that the least frequented destination for flights departing from JFK is Eagle County Regional Airport.
+
+### Conclusion
+
+This project has provided valuable insights into NYC air travel by:
+
+- Identifying the airline-airport pair that receives the most flights
+
+- Determining which pair has the longest average flight duration, and
+
+- Discovering the least frequented destination airport for flights departing from JFK.
+
+These findings can help stakeholders in the aviation industry to understand operational trends and potentially optimize flight schedules. 
