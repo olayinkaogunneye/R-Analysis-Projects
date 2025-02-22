@@ -11,7 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Introduction
 
-Air travel is a critical component of New York City's transportation system, and understanding flight trends can help improve operational efficiency and passenger experience. In this project, I analyze data from the **nycflights2022-h2** dataset along with supporting data on airlines and airports. My analysis focuses on:
+Air travel is a critical component of New York City's transportation system, and understanding flight trends can help improve operational 
+efficiency and passenger experience. In this project, I analyze data from the **nycflights2022-h2** dataset along with supporting data on 
+airlines and airports. My analysis focuses on:
 
 - Determining which airline and destination airport pair receives the most flights from NYC.
 - Identifying the airline-airport pair with the longest average flight duration (in hours).
@@ -36,7 +38,8 @@ airlines <- read_csv("C:/Users/olayi/Desktop/Data/R/flight duration/datasets/air
 airports <- read_csv("C:/Users/olayi/Desktop/Data/R/flight duration/datasets/airports.csv")
 ```
 
-Next, I join the flights, airlines, and airports datasets together. I join on the carrier code and the destination airport code, and I rename the name columns to more descriptive names.
+Next, I join the flights, airlines, and airports datasets together. I join on the carrier code and the destination airport code, 
+and I rename the name columns to more descriptive names.
 
 ```{r}
 complex_join <- flights %>%
