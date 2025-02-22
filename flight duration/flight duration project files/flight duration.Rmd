@@ -99,7 +99,8 @@ longest
 
 #### Least Common Destination from JFK
 
-Finally, I filter the data for flights departing from JFK and then determine which destination airport is the least frequent. I store the result as a character string called least.
+Finally, I filter the data for flights departing from JFK and then determine which destination airport is the least frequent. 
+I store the result as a character string called least.
 ```{r}
 jfk_destinations <- transformed_data %>% 
   filter(origin == "JFK") %>% 
