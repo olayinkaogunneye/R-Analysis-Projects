@@ -1,0 +1,325 @@
+---
+title: "super_bowl"
+author: "olayinka ogunneye"
+date: "2025-02-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+### Introduction
+
+The Super Bowl is one of the biggest annual sporting events, bringing together massive TV viewership, big-budget advertisements, and highly anticipated halftime performances. In this analysis, I focus on **modern Super Bowls** (Super Bowl from 1987 to 2024) to explore:
+
+- Whether large point differences lead to lost viewership.
+
+- How TV viewership, ratings, and advertisement costs have trended over time.
+
+- Whether the number of songs performed during the halftime show correlates with higher viewership.
+
+- Which halftime performances were the most elaborate (in terms of songs) and how they compare to   TV ratings.
+
+- Which Super Bowl had the highest rated halftime show.
+
+The data for this project comes from three CSV files:
+
+**super_bowls.csv**: Contains Super Bowl game data (including super_bowl number and difference_pts).
+
+**tv.csv** : Contains TV metrics such as avg_us_viewers, rating_household, ad_cost, and share_household.
+
+**halftime_musicians.csv** : Contains data on the musicians performing at halftime, including num_songs.
+
+I will limit the dataset to Super Bowls greater than 20 (i.e., from 1987 onwards) to examine more modern games.
+
+
+#### Load Data
+
+```{r}
+# Load CSV data
+
+super_bowls <- read_csv("C:/Users/olayi/Desktop/Data/R/R Projects/Superbowl/datasets/super_bowls.csv")
+
+tv <- read_csv("C:/Users/olayi/Desktop/Data/R/R Projects/Superbowl/datasets/tv.csv")
+
+halftime_musicians <- read_csv("C:/Users/olayi/Desktop/Data/R/R Projects/Superbowl/datasets/halftime_musicians.csv")
+
+# Inspect the loaded data
+print(super_bowls)
+
+print(tv)
+
+print(halftime_musicians)
+
+```
+
+**Data Filtering and Imputation**
+
+I focus on modern Super Bowls (from 1987 to 2024). Additionally, I will impute missing values in the 
+share_household column for a specific row (Super Bowl 57) using the average of share_household across 
+the modern dataset.
+
+```{r}
+# Filter to modern Super Bowls
+modern_superbowl <- super_bowls %>% filter(super_bowl > 20)
+modern_halftime <- halftime_musicians %>% filter(super_bowl > 20)
+modern_tv <- tv %>% filter(super_bowl > 20)
+
+# Impute missing share_household for Super Bowl 57 if needed
+impute_value <- mean(modern_tv$share_household, na.rm = TRUE)
+
+modern_tv <- modern_tv %>%
+  mutate(share_household = if_else(
+    super_bowl == 57 & is.na(share_household),
+    impute_value,
+    share_household
+  ))
+
+# Optional: Inspect updated TV data
+# View(modern_tv)
+
+```
+
+### Q1: Do Large Point Differences Result in Lost Viewers?
+
+**Histogram of Point Differences**
+
+```{r}
+ggplot(modern_superbowl, aes(difference_pts)) +
+  geom_histogram(binwidth = 2) +
+  labs(x = "Point Difference", y = "Number of Super Bowls",
+       title = "Distribution of Point Differences") 
+
+```
+
+***Interpretation:*** 
+
+- This histogram shows how many modern Super Bowls ended with close scores versus blowouts.A small point difference indicates a close game, while a large difference indicates a more one-sided match.
+
+- Close Games Are Common: The tall bars on the left suggest many modern Super Bowls ended with a relatively small point difference.
+
+- Occasional Blowouts: The few, shorter bars on the far right indicate that while blowouts do happen, they’re not the norm in modern Super Bowls.
+
+**Closest and Largest Point Difference Games**
+
+```{r}
+modern_superbowl %>%
+  filter(difference_pts == min(difference_pts) | difference_pts == max(difference_pts))
+```
+
+**Scatter Plot: Point Difference vs Viewership**
+
+```{r}
+# Merge game data with TV data
+modern_games_tv <- modern_tv %>% inner_join(modern_superbowl, by = "super_bowl")
+
+# Scatter plot with regression line
+ggplot(modern_games_tv, aes(difference_pts, share_household)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Point Difference", y = "Viewership (household share)",
+       title = "Point Difference vs. Household Share")
+
+```
+
+***Interpretation***: The regression line suggests that larger point differences might lead to lower viewership, but the relationship is weak due to the limited data.
+
+```{r}
+score_impact = "weak"
+
+score_impact
+```
+
+
+### Q2: Trends in Viewership, Ratings, and Ad Costs
+
+To see how **viewership** (avg_us_viewers), **ratings** (rating_household), and **advertisement costs** (ad_cost) have changed over time, I’ll reshape the data and plot them together.
+```{r}
+games_tv_plot <- modern_games_tv %>%
+  pivot_longer(cols = c(avg_us_viewers, rating_household, ad_cost), 
+               names_to = "category", 
+               values_to = "value") %>%
+  mutate(cat_name = case_when(
+    category == "avg_us_viewers" ~ "Average number of US viewers",
+    category == "rating_household" ~ "Household rating",
+    category == "ad_cost" ~ "Advertisement cost (USD)",
+    TRUE ~ as.character(category)
+  ))
+
+# Scale each category's values for a single plot
+games_tv_plot_scaled <- games_tv_plot %>%
+  group_by(category) %>%
+  mutate(scaled_value = value / max(value)) %>%
+  ungroup()
+
+# Plot scaled trends over time
+ggplot(games_tv_plot_scaled, aes(x = super_bowl, y = scaled_value, color = category)) +
+  geom_line() +
+  labs(x = "Super Bowl", y = "Scaled Value (0–1)", color = "Category",
+       title = "Trends in Viewership, Ratings, and Ad Costs (Scaled)")
+
+```
+
+***Interpretation:*** It appears that ratings start to increase before advertisement costs do, while viewership also climbs
+
+We conclude:
+
+```{r}
+first_to_increase = "ratings"
+first_to_increase
+```
+
+### Q3: Does the Number of Songs Performed Affect Viewership?
+
+**Merge Halftime Musicians with TV Data**
+
+```{r}
+modern_halftime_data <- modern_halftime %>%
+  inner_join(modern_tv, by = "super_bowl")
+
+```
+
+**Scatter Plot: Number of Songs vs. Average US Viewer**
+
+```{r}
+ggplot(modern_halftime_data, aes(x = num_songs, y = avg_us_viewers)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Super Bowl Viewership vs. Number of Halftime Songs",
+       x = "Number of Songs Performed",
+       y = "Average US Viewers (millions)") +
+  theme_minimal()
+
+```
+
+***Interpretation:***
+
+- The slope of the line is slightly positive, suggesting a small upward trend: as the number of songs performed increases,   average US viewership may increase slightly.
+
+- However, the points are quite scattered, indicating there isn’t a strong, clear-cut relationship.
+
+**Correlation**
+
+```{r}
+cor_value <- cor(modern_halftime_data$num_songs, modern_halftime_data$avg_us_viewers, use = "complete.obs")
+paste("Correlation between number of songs and average US viewers:", round(cor_value, 3))
+
+```
+***Interpretation of 0.121***
+
+- 0.121 is a weak positive correlation.
+
+- It implies that while there’s a small upward tendency (more songs ~ slightly higher viewership), the relationship is not   very strong.
+
+- This suggests that performing more songs during the halftime show does not strongly guarantee higher overall viewership.   Other variables (e.g., team popularity, game competitiveness, star power of the performer) may have a greater impact.
+
+### Q4: Which Musicians Performed the Most Songs?
+
+```{r}
+modern_halftime %>%
+  arrange(desc(num_songs)) %>%
+  head(5)
+
+```
+
+This shows the top 5 performers by num_songs in modern Super Bowls.
+
+### Q5: Did the Number of Songs Increase Over Time?
+
+```{r}
+ggplot(modern_halftime, aes(x = super_bowl, y = num_songs)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Trend of Songs Performed in Modern Super Bowl Halftime Shows",
+       x = "Super Bowl Number",
+       y = "Number of Songs") +
+  theme_minimal()
+
+```
+
+***interpretation***: This line chart shows the number of songs performed in modern Super Bowl halftime shows revealing considerable year-to-year fluctuation. In some years, only a few songs are performed, while others feature over ten. Although certain later Super Bowls reach higher peaks—likely reflecting increased production value and performer collaboration—there is no strict upward trend. Instead, creative and logistical factors (such as performer style, show format, and budget) play a significant role in shaping the performance. Overall, the data indicates that halftime shows can vary greatly in complexity, yet often become more elaborate in more recent Super Bowls.
+
+### Q6: Compare Performances: Solo vs. Multiple Artists
+
+**Aggregate Performance Data**
+
+```{r}
+performance_data <- modern_halftime %>%
+  group_by(super_bowl) %>%
+  summarize(
+    num_musicians = n(),
+    total_songs = sum(num_songs, na.rm = TRUE),
+    primary_musician = first(musician)
+  ) %>%
+  ungroup() %>%
+  mutate(
+    performance_type = if_else(num_musicians > 1, "Multiple Artists", "Solo")
+  )
+
+print(performance_data)
+
+```
+
+**Merge with TV Data and Boxplot**
+
+```{r}
+halftime_tv <- performance_data %>%
+  inner_join(modern_tv, by = "super_bowl")
+
+ggplot(halftime_tv, aes(x = performance_type, y = rating_household, fill = performance_type)) +
+  geom_boxplot() +
+  labs(title = "TV Ratings by Halftime Performance Type",
+       x = "Performance Type",
+       y = "Household TV Rating") +
+  theme_minimal()
+
+```
+
+***interpretation***: This boxplot compares household TV ratings for Super Bowls where the halftime show featured multiple artists versus a solo performer. Each box represents the distribution of ratings for that performance type:
+
+Median Rating: The horizontal line within each box shows the median household rating.
+
+Box & Whiskers: The box captures the middle 50% of the data, and the whiskers extend to cover a wider range of ratings.
+Visually, the two boxes are fairly close, suggesting that multiple-artist shows and solo performances both fall into a similar rating range. While multiple-artist performances may show slightly higher or more varied ratings, there isn’t a dramatic difference in medians. This indicates that, overall, having more performers doesn’t necessarily guarantee a significantly higher household rating—other factors (e.g., artist popularity, game competitiveness) likely play a larger role in driving viewership.
+
+### Q7: Association Between Total Songs and TV Ratings
+
+```{r}
+ggplot(halftime_tv, aes(x = total_songs, y = rating_household)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Association Between Total Songs and TV Ratings",
+       x = "Total Number of Songs Performed",
+       y = "Household TV Rating") +
+  theme_minimal()
+
+correlation <- cor(halftime_tv$total_songs, halftime_tv$rating_household, use = "complete.obs")
+paste("Correlation between total songs and TV rating:", round(correlation, 3))
+
+```
+
+***interpretation***: visually, the trend line has a slight positive slope, indicating that, in general, higher numbers of total songs performed are marginally associated with higher household TV ratings. However, the points are somewhat scattered, suggesting that total songs alone do not strongly predict household ratings.
+
+**Correlation (r = 0.138)**
+
+- The correlation coefficient of 0.138 indicates a weak positive relationship between the total number of songs performed   and household TV ratings.
+
+- A correlation of 0.138 is close to zero, which implies that while there is a slight tendency for more songs to coincide    with slightly higher ratings, the relationship is not very strong.
+
+### Q8: Identify the Highest Rated Halftime Show
+
+```{r}
+highest_rated <- halftime_tv %>%
+  arrange(desc(rating_household)) %>%
+  select(super_bowl, performance_type, primary_musician, rating_household, total_songs) %>%
+  head(1)
+
+highest_rated
+
+```
+
+### Conclusion
+
+In this modern Super Bowl analysis, I found thatlarge point differences do not significantly reduce viewership (only a weak negative relationship). Ratings tend to rise before ad costs do, while the number of songs performed has only a weak correlation with average US viewership or household TV ratings. Notably, Rihanna tops the chart with 14 songs, yet multiple-artist performances do not guarantee higher ratings. Finally, the highest-rated halftime show was Super Bowl 49, featuring multiple artists (led by Katy Perry) with a household rating of 47.5. Overall, many factors beyond just point difference or halftime complexity appear to shape viewership and ratings.
